@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { AuthenticatedRequest } from '../types/api.types';
+import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { MessagingService } from '../services/messaging.service';
 import { AttachmentService } from '../services/attachment.service';
 import { ResponseUtil } from '../utils/response.utils';
@@ -138,7 +138,7 @@ export const ConversationsController = {
 
     const count = await MessagingService.markAsRead(id, userId);
     ResponseUtil.success(res, { markedRead: count }, 'Messages marked as read');
-  }
+  },
 
   /**
    * POST /api/v1/conversations/:id/messages/read
@@ -172,8 +172,8 @@ export const ConversationsController = {
     const userId = req.user!.id;
     const { id } = req.params as Record<string, string>;
 
-    const file = (req as any).file;
-    if (!file) {
+    const file = req.file;
+    if (!file?.path) {
       ResponseUtil.error(res, 'No file uploaded', 400);
       return;
     }
@@ -181,9 +181,10 @@ export const ConversationsController = {
     const result = await AttachmentService.uploadAttachment(
       id,
       userId,
-      file.buffer,
+      file.path,
       file.originalname,
       file.mimetype,
+      file.size,
     );
 
     if (!result) {

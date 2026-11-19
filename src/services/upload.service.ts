@@ -11,8 +11,8 @@
  *  - Virus-scan job enqueued via the existing VIRUS_SCAN queue
  */
 
-import sharp from 'sharp';
 import { StorageService } from './storage.service';
+import { ImageOptimizationService } from './image-optimization.service';
 import { virusScanQueue } from '../queues/virus-scan.queue';
 import { logger } from '../utils/logger.utils';
 import { env } from '../config/env';
@@ -107,7 +107,7 @@ export const UploadService = {
    * Process and upload a user avatar to S3.
    *
    * @param userId        - Authenticated user's ID (used as part of the S3 key)
-   * @param fileBuffer    - Raw file bytes received from multer
+   * @param fileInput     - Temporary file path or raw bytes for the uploaded image
    * @param mimeType      - MIME type reported by multer (validated here as well)
    * @param sizeBytes     - File size in bytes (validated before sharp processing)
    * @param oldAvatarUrl  - Current avatar_url from the DB (if any); deleted from S3 when set
@@ -115,7 +115,7 @@ export const UploadService = {
    */
   async uploadAvatar(
     userId: string,
-    fileBuffer: Buffer,
+    fileInput: string | Buffer,
     mimeType: string,
     sizeBytes: number,
     oldAvatarUrl: string | null,
@@ -131,7 +131,7 @@ export const UploadService = {
     }
 
     // ── 3. Resize & compress with sharp (256×256 JPEG) ──────────────────────
-    const processedBuffer = await sharp(fileBuffer)
+    const processedBuffer = await sharp(fileInput)
       .resize(AVATAR_WIDTH, AVATAR_HEIGHT, {
         fit: 'cover',         // crop to fill the square, preserving aspect ratio
         position: 'center',
@@ -141,10 +141,10 @@ export const UploadService = {
 
     // ── 4. Generate a unique S3 key ─────────────────────────────────────────
     const timestamp = Date.now();
-    const s3Key = `avatars/${userId}/${timestamp}.jpg`;
+    const s3Key = `avatars/${userId}/${timestamp}.webp`;
 
     // ── 5. Upload to S3 ─────────────────────────────────────────────────────
-    await StorageService.uploadFile(s3Key, processedBuffer, 'image/jpeg', {
+    await StorageService.uploadFile(s3Key, processedBuffer, 'image/webp', {
       userId,
       uploadedAt: new Date().toISOString(),
     });
